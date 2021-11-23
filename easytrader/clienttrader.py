@@ -223,6 +223,13 @@ class ClientTrader(IClientTrader):
         return self.trade(security, price, amount)
 
     @perf_clock
+    def convert(self, security, price, amount, **kwargs):
+        self._switch_left_menus(["其他交易", "其他买卖"])
+
+        return self.convert_act(security, price, amount)
+
+
+    @perf_clock
     def market_buy(self, security, amount, ttype=None, limit_price=None, **kwargs):
         """
         市价买入
@@ -415,10 +422,18 @@ class ClientTrader(IClientTrader):
         self._set_trade_params(security, price, amount)
 
         self._submit_trade()
-
+        print("here.....")
         return self._handle_pop_dialogs(
             handler_class=pop_dialog_handler.TradePopDialogHandler
         )
+
+    def convert_act(self, security, price, amount):
+        self._set_trade_params(security, price, amount)
+
+        self._submit_trade()
+        return self._handle_pop_dialogs(
+            handler_class=pop_dialog_handler.ConvertDialogHandler
+        )        
 
     def _click(self, control_id):
         self._app.top_window().child_window(

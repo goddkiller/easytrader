@@ -56,6 +56,26 @@ class PopDialogHandler:
     def _close(self):
         self._app.top_window().close()
 
+class ConvertDialogHandler(PopDialogHandler):
+    @perf_clock
+    def handle(self, title) -> Optional[dict]:
+        if title == "提示信息":
+            self._submit_by_shortcut()
+            return None
+
+        if title == "提示":
+            content = self._extract_content()
+            if "成功" in content:
+                entrust_no = self._extract_entrust_id(content)
+                self._submit_by_click()
+                return {"entrust_no": entrust_no}
+
+            self._submit_by_click()
+            time.sleep(0.05)
+            raise exceptions.TradeError(content)
+        self._close()
+        return None
+
 
 class TradePopDialogHandler(PopDialogHandler):
     @perf_clock
