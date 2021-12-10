@@ -7,7 +7,7 @@ import re
 import sys
 import time
 from typing import Type, Union
-
+import datetime
 import hashlib, binascii
 
 import easyutils
@@ -212,21 +212,39 @@ class ClientTrader(IClientTrader):
 
     @perf_clock
     def buy(self, security, price, amount, **kwargs):
-        self._switch_left_menus(["买入[F1]"])
-
-        return self.trade(security, price, amount)
+        t0 = datetime.datetime.now().timestamp()
+        self._switch_left_menus_buy(["买入[F1]"])
+        self._set_trade_params(security, price, str(amount))
+        self._submit_trade()
+        # print("here.....")
+        self.wait(0.3)
+        self._app.top_window().type_keys('y')
+        t1 =  datetime.datetime.now().timestamp()
+        # print('durin', t1 - t0)
+        res = self._handle_pop_dialogs(
+            handler_class=pop_dialog_handler.TradePopDialogHandler
+        )
+        
+        return res
+        # return self.trade(security, price, amount)
 
     @perf_clock
     def sell(self, security, price, amount, **kwargs):
-        self._switch_left_menus(["卖出[F2]"])
-
-        return self.trade(security, price, amount)
+        self._switch_left_menus_sell(["卖出[F2]"])
+        self._set_trade_params(security, price, str(amount))
+        self._submit_trade()
+        self.wait(0.3)
+        self._app.top_window().type_keys('y')
 
     @perf_clock
     def convert(self, security, price, amount, **kwargs):
         self._switch_left_menus(["其他交易", "其他买卖"])
 
         return self.convert_act(security, price, amount)
+
+    # @perf_clock
+    # def refresh(self, security, price, amount, **kwargs):
+    #     self._switch_left_menus(["其他交易", "其他买卖"])
 
 
     @perf_clock
@@ -419,13 +437,22 @@ class ClientTrader(IClientTrader):
                 window.close()
 
     def trade(self, security, price, amount):
-        self._set_trade_params(security, price, amount)
+        # t0 = datetime.datetime.now().timestamp()
 
+        self._set_trade_params(security, price, amount)
+        # t1 = datetime.datetime.now().timestamp()
+        # print('tc1',t1  - t0)
         self._submit_trade()
-        print("here.....")
-        return self._handle_pop_dialogs(
-            handler_class=pop_dialog_handler.TradePopDialogHandler
-        )
+        # print('tc2', datetime.datetime.now().timestamp() - t1)
+        # print("here.....")
+        self.wait(0.3)
+        self._app.top_window().type_keys('y')
+        # t2 = datetime.datetime.now().timestamp()
+        # pop_dialog_handler._submit_by_click()
+        # print('tc3', datetime.datetime.now().timestamp() - t2)
+        # return self._handle_pop_dialogs(
+        #     handler_class=pop_dialog_handler.TradePopDialogHandler
+        # )
 
     def convert_act(self, security, price, amount):
         self._set_trade_params(security, price, amount)
@@ -442,7 +469,7 @@ class ClientTrader(IClientTrader):
 
     @perf_clock
     def _submit_trade(self):
-        time.sleep(0.2)
+        # time.sleep(0.1)
         self._main.child_window(
             control_id=self._config.TRADE_SUBMIT_CONTROL_ID, class_name="Button"
         ).click()
@@ -463,27 +490,45 @@ class ClientTrader(IClientTrader):
 
     def _set_trade_params(self, security, price, amount):
         code = security[-6:]
-
-        self._type_edit_control_keys(self._config.TRADE_SECURITY_CONTROL_ID, code)
-
-        # wait security input finish
+        t0 = datetime.datetime.now().timestamp()
+        # editor = self._main.child_window(control_id=self._config.TRADE_SECURITY_CONTROL_ID, class_name="Edit")
+        # editor.type_keys(code)
+        self._app.top_window().type_keys(code)
+        self._app.top_window().type_keys('{TAB}')
         self.wait(0.1)
-
-        # 设置交易所
-        if security.lower().startswith("sz"):
-            self._set_stock_exchange_type("深圳Ａ股")
-        if security.lower().startswith("sh"):
-            self._set_stock_exchange_type("上海Ａ股")
-
+        if price != '':
+            self._app.top_window().type_keys(price)
+        # self._app.top_window().type_keys('{TAB}')
         self.wait(0.1)
-
-        self._type_edit_control_keys(
-            self._config.TRADE_PRICE_CONTROL_ID,
-            easyutils.round_price_by_code(price, code),
-        )
         self._type_edit_control_keys(
             self._config.TRADE_AMOUNT_CONTROL_ID, str(int(amount))
         )
+        # self._app.top_window().type_keys(str(amount)) 
+        self.wait(0.1)      
+        # self._type_edit_control_keys(self._config.TRADE_SECURITY_CONTROL_ID, code)
+
+        # t1 = datetime.datetime.now().timestamp()
+        # print('set code',t1 -t0)
+        # wait security input finish
+        # self.wait(0.1)
+
+        # 设置交易所
+        # if security.lower().startswith("sz"):
+        #     self._set_stock_exchange_type("深圳Ａ股")
+        # if security.lower().startswith("sh"):
+        #     self._set_stock_exchange_type("上海Ａ股")
+
+        # self.wait(0.1)
+        # t1 = datetime.datetime.now().timestamp()
+        # print('set code',t1 -t0)
+        # self._type_edit_control_keys(
+        #     self._config.TRADE_PRICE_CONTROL_ID,
+        #     easyutils.round_price_by_code(price, code),
+        # )
+        # self._type_edit_control_keys(
+        #     self._config.TRADE_AMOUNT_CONTROL_ID, str(int(amount))
+        # )
+
 
     def _set_market_trade_params(self, security, amount, limit_price=None):
         self._type_edit_control_keys(
@@ -519,6 +564,9 @@ class ClientTrader(IClientTrader):
             editor.select()
             editor.type_keys(text)
 
+    # def _type_edit_control_keys_short(self, control_id, text):
+    #         editor.type_keys(text)
+
     def type_edit_control_keys(self, editor, text):
         if not self._editor_need_type_keys:
             editor.set_edit_text(text)
@@ -537,6 +585,23 @@ class ClientTrader(IClientTrader):
         self._get_left_menus_handle().get_item(path).select()
         self._app.top_window().type_keys('{F5}')
         self.wait(sleep)
+    
+    def _switch_left_menus_buy(self, path, sleep=0.2):
+        # self.close_pop_dialog()
+        # t0 = datetime.datetime.now().timestamp()
+        self._app.top_window().type_keys('{F1}')
+        # self._get_left_menus_handle().get_item(path).select()
+        # t1 = datetime.datetime.now().timestamp()
+        # self._app.top_window().type_keys('{F5}')
+        # self.wait(sleep)
+    def _switch_left_menus_sell(self, path, sleep=0.2):
+        # self.close_pop_dialog()
+        # t0 = datetime.datetime.now().timestamp()
+        self._app.top_window().type_keys('{F2}')
+        # self._get_left_menus_handle().get_item(path).select()
+        # t1 = datetime.datetime.now().timestamp()
+        # self._app.top_window().type_keys('{F5}')
+        # self.wait(sleep)
 
     def _switch_left_menus_by_shortcut(self, shortcut, sleep=0.5):
         self.close_pop_dialog()
